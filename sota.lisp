@@ -152,24 +152,70 @@ spot page changes."
   "Calculate the age of a SOTA spot in seconds."
   (- (local-time:timestamp-to-universal (local-time:now)) (local-time:timestamp-to-universal (timestamp s))))
 
+(defmethod band ((s sota-spot))
+  "Calculate the band (160m-2m), based on the frequency (for US
+bands). Returns the band as an integer. nil if it's lower than 160m,
+higher than 2m, or falls outside of a valid band."
+  (let ((f (freq s)))
+    (cond
+      ((and (>= f 1.8)
+	    (<= f 2.0))
+       160)
+      ((and (>= f 3.5)
+	    (<= f 4.0))
+       80)
+      ((and (>= f 5.3)
+	    (<= f 5.5))
+       60)
+      ((and (>= f 7.0)
+	    (<= f 7.3))
+       40)
+      ((and (>= f 10.1)
+	    (<= f 10.15))
+       30)
+      ((and (>= f 14.0)
+	    (<= f 14.35))
+       20)
+      ((and (>= f 18.068)
+	    (<= f 18.168))
+       17)
+      ((and (>= f 21.0)
+	    (<= f 21.45))
+       15)
+      ((and (>= f 24.89)
+	    (<= f 24.99))
+       12)
+      ((and (>= f 28.0)
+	    (<= f 29.7))
+       10)
+      ((and (>= f 50.0)
+	    (<= f 54.0))
+       6)
+      ((and (>= f 144.0)
+	    (<= f 148.0))
+       2)
+      (t nil))))
+
 (defmethod pp ((s sota-spot))
   "Pretty print a SOTA spot object."
-  (format t "~A ~A ~A ~A ~A ~A ~A~%"
+  (format t "~A ~A ~A ~A ~A ~A ~A ~A~%"
 	  (local-time:format-timestring nil (timestamp s) :format local-time:+rfc-1123-format+)
 	  (callsign s)
 	  (area s)
 	  (summit s)
+	  (band s)
 	  (freq s)
 	  (mode s)
 	  (age s)))
 
 (defmethod spot-hash-key ((s sota-spot))
   "Create a hash key to refer to this SOTA spot object."
-  (format nil "~A ~A ~A ~A ~A ~A"
+  (format nil "~A ~A ~A ~A ~A ~A ~A"
 	  (local-time:format-timestring nil (timestamp s) :format local-time:+rfc-1123-format+)
 	  (callsign s)
 	  (area s)
 	  (summit s)
+	  (band s)
 	  (freq s)
 	  (mode s)))
 
