@@ -42,6 +42,37 @@
 		       "-"
 		       (second stuff)))))
 
+(defun get-associations ()
+  "Return a list of all current associations (as specified by the SOTA
+mapping page) with their associated descriptions, with the association
+name as the first item in the list. Some lists have two entries, some
+have three. Note that this function is extremely brittle, and will
+need to be fixed if/when SOTA changes their web page."
+  (mapcar
+   (lambda (n)
+     (mapcar
+      (lambda (n)
+	(string-trim
+	 '(#\Space #\Tab #\Newline #\Linefeed) n))
+      (split-sequence:split-sequence #\- (second n))))
+   (rest
+    (rest
+     (seventh
+      (second
+       (second
+	(second
+	 (second
+	  (second
+	   (second
+	    (sixth
+	     (second
+	      (second
+	       (third
+		(fifth
+		 (third
+		  (second
+		   (get-url "https://sotamaps.org/")))))))))))))))))))
+
 (defun get-association-list ()
   "Return a list of all current associations (as specified by the SOTA
 mapping page). Note that this function is extremely brittle, and will
@@ -53,24 +84,8 @@ need to be fixed if/when SOTA changes their web page."
 	      (lambda (n)
 		(string-trim
 		 '(#\Space #\Tab #\Newline #\Linefeed) n))
-	      (split-sequence:split-sequence #\- (second n))))
-	   (rest
-	    (rest
-	     (seventh
-	      (second
-	       (second
-		(second
-		 (second
-		  (second
-		   (second
-		    (sixth
-		     (second
-		      (second
-		       (third
-			(fifth
-			 (third
-			  (second
-			   (get-url "https://sotamaps.org/"))))))))))))))))))))
+	      (split-sequence:split-sequence #\- (first n))))
+	   (get-associations))))
 
 (defun correct-date-for-day (day)
   "The SOTA spots page returns a day/time in GMT for each spot. This

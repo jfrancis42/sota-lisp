@@ -4,17 +4,25 @@
   (:use #:cl)
   (:export :get-peak
 	   :get-association-list
+	   :get-associations
 	   :make-sota-spot
 	   :make-sota-peak
 	   :*sleep-between-fetches*
 	   :*spots*
 	   :*spot-lock*
 	   :*spot-thread*
-	   :age
+	   :timestamp
+	   :comment
+	   :callsign
+	   :summit
+	   :summit-url
 	   :area
+	   :freq
+	   :band
 	   :mode
-	   :start-spotter
 	   :processed
+	   :age
+	   :start-spotter
 	   :show-all-spots
 	   :show-spots
 	   :spot-hash-key

@@ -1,5 +1,7 @@
 # SOTA
 
+## Note that this documentation almost always lags behind the actual code (because writing code is more fun than writing docs).
+
 SOTA, or Summits on the Air, is a ham radio organization where ham operators climb mountains to operate, and make contacts to people on other peaks, as well as home stations. Coordination of activities is done with the SOTA web page at http://www.sotawatch.org/
 
 When an operator is heard on a mountain-top, he is "spotted" on the web page (it's not uncommon for operators to spot themselves when cell coverage is available) so that other operators know where he is and what frequency and mode he is operating on. Points are earned by both parties, and the entire process is somewhat competitive, meaning that timely awareness of mountain-top operators is crucial.
