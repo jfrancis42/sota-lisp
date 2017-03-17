@@ -12,6 +12,7 @@
 	   :*spot-thread*
 	   :age
 	   :area
+	   :mode
 	   :start-spotter
 	   :processed
 	   :show-all-spots

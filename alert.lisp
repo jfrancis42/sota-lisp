@@ -47,13 +47,13 @@ spots that have already been sent."
 		      n))	    
 		  (let ((keys nil)) (maphash (lambda (key value) (setf keys (cons key keys))) sota:*spots*) keys))))
 
-(defun send-pushover-message (message)
+(defun send-pushover-message (message sound)
   "Send the actual message to the user."
   (pushover:send-pushover
    (creds:get-cred "potoken")
    (creds:get-cred "pouser")
    message
-   :sound :spacealarm))
+   :sound sound))
 
 (defun send-new-spots (favorites)
   "Send all of the new spots that match the user's criteria."
@@ -61,7 +61,9 @@ spots that have already been sent."
     (mapcar (lambda (n)
 	      (unless (null n)
 		;(print (sota:spot-hash-key (gethash n sota:*spots*)))
-		(send-pushover-message (sota:spot-hash-key (gethash n sota:*spots*)))))
+		(if (equal (sota:mode (gethash n sota:*spots*)) "ssb")
+		    (send-pushover-message (sota:spot-hash-key (gethash n sota:*spots*)) :cosmic)
+		    (send-pushover-message (sota:spot-hash-key (gethash n sota:*spots*)) :spacealarm))))
 	    (get-my-spots *how-far-back* favorites))))
 
 (defun send-new-spots-thread ()
