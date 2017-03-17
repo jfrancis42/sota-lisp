@@ -3,7 +3,7 @@
 (defpackage #:sota
   (:use #:cl)
   (:export :get-peak
-	   :get-associations
+	   :get-association-list
 	   :make-sota-spot
 	   :make-sota-peak
 	   :*sleep-between-fetches*

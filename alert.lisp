@@ -8,7 +8,7 @@
 ; tweak to your taste. With my crappy antenna, I limit results to
 ; these regions because that's all I can hear, anyway. YMMV. You can
 ; get a list of all the regions by loading the sota package and
-; running (sota:get-associations)."
+; running (sota:get-association-list)."
 (defparameter *how-far-back* 3600)
 (defparameter *favorites* (list "VE7" "W0C" "W5N" "W6" "W7I" "W7M" "W7N" "W7O" "W7U" "W7Y" "W7A" "KLA" "KLF" "KLS"))
 
@@ -60,12 +60,6 @@ objects (useful for taking a peek at the data)."
 		;(print (sota:spot-hash-key (gethash n sota:*spots*)))
 		(send-pushover-message (sota:spot-hash-key (gethash n sota:*spots*)))))
 	    (get-my-spots *how-far-back* favorites))))
-
-(defun get-association-list ()
-  "Return a list of all current associations (as specified by the SOTA
-mapping page). For use when you want all results instead of just a
-favorites list."
-  (mapcar (lambda (n) (first n)) (sota:get-associations)))
 
 (defun send-new-spots-thread ()
   "This is the thread that runs forever sending spots (marking each

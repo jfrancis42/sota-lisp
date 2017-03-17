@@ -42,34 +42,35 @@
 		       "-"
 		       (second stuff)))))
 
-(defun get-associations ()
-  "Get a list of Associations and their abbreviations from the SOTA
-mapping site. Note that this function is extremely brittle, and will
+(defun get-association-list ()
+  "Return a list of all current associations (as specified by the SOTA
+mapping page). Note that this function is extremely brittle, and will
 need to be fixed if/when SOTA changes their web page."
-  (mapcar
-   (lambda (n)
-     (mapcar
-      (lambda (n)
-	(string-trim
-	 '(#\Space #\Tab #\Newline #\Linefeed) n))
-      (split-sequence:split-sequence #\- (second n))))
-   (rest
-    (rest
-     (seventh
-      (second
-       (second
-	(second
-	 (second
-	  (second
-	   (second
-	    (sixth
-	     (second
+  (mapcar (lambda (n) (first n)) 
+	  (mapcar
+	   (lambda (n)
+	     (mapcar
+	      (lambda (n)
+		(string-trim
+		 '(#\Space #\Tab #\Newline #\Linefeed) n))
+	      (split-sequence:split-sequence #\- (second n))))
+	   (rest
+	    (rest
+	     (seventh
 	      (second
-	       (third
-		(fifth
-		 (third
+	       (second
+		(second
+		 (second
 		  (second
-		   (get-url "https://sotamaps.org/")))))))))))))))))))
+		   (second
+		    (sixth
+		     (second
+		      (second
+		       (third
+			(fifth
+			 (third
+			  (second
+			   (get-url "https://sotamaps.org/"))))))))))))))))))))
 
 (defun correct-date-for-day (day)
   "The SOTA spots page returns a day/time in GMT for each spot. This
@@ -309,13 +310,13 @@ nil."
 (defun grim-reaper (&optional (max-age *age-out*))
        (bt:with-lock-held (*spot-lock*)
 	 (mapcar
-	  (lambda (n) (remhash n sota:*spots*))
+	  (lambda (n) (remhash n *spots*))
 	  (let ((keys nil))
 	    (maphash
 	     (lambda (key value)
-	       (when (> (sota:age value) max-age)
+	       (when (> (age value) max-age)
 		 (setf keys (cons key keys))))
-	     sota:*spots*)
+	     *spots*)
 	    keys))))
 
 (defun spot-fetcher-thread ()

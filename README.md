@@ -21,7 +21,7 @@ The thread will run forever, keeping the sota:\*spots\* hash up to date with the
 If you'd like to use the alert.lisp program, you'll first want to do a little customizing. The first thing you'll want to do is construct a list of the associations you'll want to receive spots from. A full list can be obtained by calling:
 
 ```
-(spot:get-associations)
+(spot:get-association-list)
 ```
 
 The list of desired associations must be configured in the source, by setting the value of \*favorites\*. I live in the Seattle area, and the list is set to the areas I care most about (ie, the areas I can reliably communicate with, given my mediocre antenna). Once \*favorites\* has been properly set, you can call the following function to display a list of spots that match your selected associations within the specified number of seconds (one hour, in this example):
