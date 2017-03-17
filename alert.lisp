@@ -33,13 +33,16 @@ that if you use this get-my-spots function in your own code, you'll
 need to wrap it in a (bt:with-lock-held (sota:*spot-lock*) ), else you
 risk inconsistent results. If you specify an optional third argument
 as nil, this function will not set the processed flag in the spot
-objects (useful for taking a peek at the data)."
+objects (useful for taking a peek at the data) and will also display
+spots that have already been sent."
   (remove nil
 	  (mapcar (lambda (n)
 		    (when (and
 			   (member (sota:area (gethash n sota:*spots*)) regions :test 'equal)
 			   (<= (sota:age (gethash n sota:*spots*)) max-age)
-			   (not (sota:processed (gethash n sota:*spots*))))
+			   (if process
+			       (not (sota:processed (gethash n sota:*spots*)))
+			       t))
 		      (when process (setf (sota:processed (gethash n sota:*spots*)) t))
 		      n))	    
 		  (let ((keys nil)) (maphash (lambda (key value) (setf keys (cons key keys))) sota:*spots*) keys))))
