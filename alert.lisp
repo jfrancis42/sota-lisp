@@ -12,7 +12,7 @@
 (defparameter *how-far-back* 3600)
 (defparameter *pref-assocs* (list "VE7" "W0C" "W5N" "W6" "W7I" "W7M" "W7N" "W7O" "W7U" "W7Y" "W7A" "KLA" "KLF" "KLS"))
 (defparameter *pref-modes* (list "cw" "am" "ssb"))
-(defparameter *pref-bands* (list 80 60 40 30 20 20 17))
+(defparameter *pref-bands* (list 80 60 40 30 20 17))
 (defparameter *pref-min-dist* 0)
 (defparameter *pref-max-dist* 1000)
 (defparameter *home-lat* 47.837578)
@@ -92,6 +92,11 @@ one as sent once it's passed to pushover)."
 			(lambda () (send-new-spots-thread))
 			:name "sota-alert")))
 
-(defun bin ()
+(defun start-bin ()
+  "Start the spotter thread (used only when creating a binary)."
+  (sota:start-spotter)
+  (send-new-spots-thread))
+
+(defun make-bin ()
   "Write a an executable compiled version of the code to disk."
-  (sb-ext:save-lisp-and-die "sota_alerts" :toplevel #'start-alerts :executable t :purify t :compression 9))
+  (sb-ext:save-lisp-and-die "sota-alerts" :toplevel #'start-bin :executable t :purify t :compression 9))
