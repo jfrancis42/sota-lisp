@@ -7,6 +7,7 @@
 (defparameter *spot-thread* nil)
 (defparameter *spot-lock* (bt:make-lock))
 (defparameter *sota-rss* t) ; t to use RSS, nil to scrape the sotawatch HTML
+(defparameter *association-cache* nil)
 
 (defun get-raw-url (url)
   "Fetch the data at the specified URL."
@@ -15,6 +16,13 @@
 (defun get-parsed-url (url)
   "Fetch the data at the specified URL and parse it."
   (html-parse:parse-html (get-raw-url url)))
+
+(defun join (stuff separator)
+  "Join a list of strings with a separator (like ruby string.join())."
+  (with-output-to-string (out)
+    (loop (princ (pop stuff) out)
+       (unless stuff (return))
+       (princ separator out))))
 
 (defun get-spots-from-scrape ()
   "Get the spots page from the SOTA web page, parse the HTML, then
@@ -104,6 +112,14 @@ need to be fixed if/when SOTA changes their web page."
 		  (second
 		   (get-parsed-url "https://sotamaps.org/")))))))))))))))))))
 
+(defun get-association-alist ()
+  "Return all associations as an alist."
+  (mapcar (lambda (n) (cons (first n) (list (rest n)))) *association-cache*))
+
+(defun show-association (a)
+  "Show the assocation, given the abbreviation."
+  (join (second (assoc a (get-association-alist) :test 'equal)) " - "))
+
 (defun get-association-list ()
   "Return a list of all current associations (as specified by the SOTA
 mapping page). Note that this function is extremely brittle, and will
@@ -116,7 +132,7 @@ need to be fixed if/when SOTA changes their web page."
 		(string-trim
 		 '(#\Space #\Tab #\Newline #\Linefeed) n))
 	      (split-sequence:split-sequence #\- (first n))))
-	   (get-associations))))
+	   *association-cache*)))
 
 (defun correct-date-for-day (day)
   "The SOTA spots page returns a day/time in GMT for each spot. This
@@ -412,6 +428,7 @@ the spot hash."
 
 (defun start-spotter ()
   "Start the spotter thread."
+  (setf *association-cache* (get-associations))
   (setf *spot-thread* (bt:make-thread
 		       (lambda () (spot-fetcher-thread))
 		       :name "sota-spots")))
