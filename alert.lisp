@@ -43,6 +43,7 @@ objects (useful for taking a peek at the data) and will also display
 spots that have already been sent. Example:
 
 (get-my-spots 3600 *pref-assocs* *pref-bands* *pref-modes* nil)
+(get-my-spots 3600 (sota:get-association-list) *pref-bands* *pref-modes* nil)
 "
   (remove nil
 	  (mapcar (lambda (n)
@@ -90,3 +91,7 @@ one as sent once it's passed to pushover)."
   (setf *alert-thread* (bt:make-thread
 			(lambda () (send-new-spots-thread))
 			:name "sota-alert")))
+
+(defun bin ()
+  "Write a an executable compiled version of the code to disk."
+  (sb-ext:save-lisp-and-die "sota_alerts" :toplevel #'start-alerts :executable t :purify t :compression 9))

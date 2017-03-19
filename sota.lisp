@@ -388,6 +388,7 @@ nil."
     t))
 
 (defun grim-reaper (&optional (max-age *age-out*))
+  "Removes entries older than max-age seconds in the hash table."
        (bt:with-lock-held (*spot-lock*)
 	 (mapcar
 	  (lambda (n) (remhash n *spots*))
