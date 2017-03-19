@@ -3,7 +3,9 @@
 (defpackage #:sota
   (:use #:cl)
   (:export :get-peak
+	   :show-association
 	   :get-association-list
+	   :get-association-alist
 	   :get-associations
 	   :make-sota-spot
 	   :make-sota-peak
