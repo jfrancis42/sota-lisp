@@ -6,20 +6,31 @@
 (defparameter *spots* (make-hash-table :test #'equal))
 (defparameter *spot-thread* nil)
 (defparameter *spot-lock* (bt:make-lock))
+(defparameter *sota-rss* t) ; t to use RSS, nil to scrape the sotawatch HTML
 
-(defun get-url (url)
+(defun get-raw-url (url)
+  "Fetch the data at the specified URL."
+  (drakma:http-request url :method :get))
+
+(defun get-parsed-url (url)
   "Fetch the data at the specified URL and parse it."
-  (html-parse:parse-html (drakma:http-request url :method :get)))
+  (html-parse:parse-html (get-raw-url url)))
 
-(defun get-spots ()
-  "Get the spots page from the SOTA web page and parse it."
-  (rest (rest (rest (fifth (second (fourth (second (get-url "http://www.sotawatch.org/spots.php")))))))))
+(defun get-spots-from-scrape ()
+  "Get the spots page from the SOTA web page, parse the HTML, then
+extract the bits we want to use."
+  (rest (rest (rest (fifth (second (fourth (second (get-parsed-url "http://www.sotawatch.org/spots.php")))))))))
 
-(defun get-peak (summit-url)
+(defun get-spots-from-rss ()
+  "Get the spots page from the SOTA RSS page, parse the result, then
+return list of parsed RSS entry objects."
+  (rss:items (rss:parse-rss-stream (drakma:http-request "http://old.sota.org.uk/RssFeed" :method :get))))
+
+(defun get-peak-from-scrape (summit-url)
   "Get the info on the specified SOTA peak and parse the result."
-  (get-url summit-url))
+  (get-parsed-url summit-url))
 
-(defun make-date (thing)
+(defun parse-scraped-date (thing)
   "Convert the date format to something local-time can parse."
   (let ((stuff (split-sequence:split-sequence #\Space thing)))
     (list (first stuff)
@@ -42,6 +53,26 @@
 		       "-"
 		       (second stuff)))))
 
+(defun parse-rss-date (thing)
+  "Convert the date format to something local-time can parse."
+  (concatenate 'string
+	       (fourth thing) "-"
+	       (cond
+		 ((equal (third thing) "Jan") "01")
+		 ((equal (third thing) "Feb") "02")
+		 ((equal (third thing) "Mar") "03")
+		 ((equal (third thing) "Apr") "04")
+		 ((equal (third thing) "May") "05")
+		 ((equal (third thing) "Jun") "06")
+		 ((equal (third thing) "Jul") "07")
+		 ((equal (third thing) "Aug") "08")
+		 ((equal (third thing) "Sep") "09")
+		 ((equal (third thing) "Oct") "10")
+		 ((equal (third thing) "Nov") "11")
+		 ((equal (third thing) "Dec") "12"))
+	       "-" (second thing) "T"
+	       (fifth thing) "Z"))
+	       
 (defun get-associations ()
   "Return a list of all current associations (as specified by the SOTA
 mapping page) with their associated descriptions, with the association
@@ -71,7 +102,7 @@ need to be fixed if/when SOTA changes their web page."
 		(fifth
 		 (third
 		  (second
-		   (get-url "https://sotamaps.org/")))))))))))))))))))
+		   (get-parsed-url "https://sotamaps.org/")))))))))))))))))))
 
 (defun get-association-list ()
   "Return a list of all current associations (as specified by the SOTA
@@ -101,11 +132,11 @@ actual date."
 	 (tomorrow-thing (local-time:format-timestring nil (local-time:universal-to-timestamp (+ (local-time:timestamp-to-universal right-now) 86400)) :timezone local-time:+utc-zone+ :format local-time:+rfc-1123-format+)))
     (cond
       ((equal day (first (split-sequence:split-sequence #\, yesterday-thing)))
-       (second (make-date yesterday-thing)))
+       (second (parse-scraped-date yesterday-thing)))
       ((equal day (first (split-sequence:split-sequence #\, today-thing)))
-       (second (make-date today-thing)))
+       (second (parse-scraped-date today-thing)))
       ((equal day (first (split-sequence:split-sequence #\, tomorrow-thing)))
-       (second (make-date tomorrow-thing)))
+       (second (parse-scraped-date tomorrow-thing)))
       (t nil))))
 
 ; A SOTA spot object.
@@ -138,7 +169,7 @@ actual date."
 	      :initarg :processed
 	      :initform nil)))
 
-(defun make-sota-spot (thing)
+(defun make-sota-spot-from-scrape (thing)
   "Create a SOTA spot object from parsed HTML. Note that this function
 is very brittle, and will break horribly if/when the HTML in the SOTA
 spot page changes."
@@ -164,6 +195,24 @@ spot page changes."
 		       :freq (with-input-from-string (in (first freq-mode)) (read-number:read-float in))
 		       :mode (string-downcase (second freq-mode)))))))
 
+(defun make-sota-spot-from-rss-item (item)
+  "Create a SOTA spot object from a parsed RSS item."
+  (let* ((title-thing (split-sequence:split-sequence #\Space (rss:title item)))
+	 (summit-thing (split-sequence:split-sequence #\/ (third title-thing)))
+	 (description (rss:description item))
+	 (timestamp-thing (split-sequence:split-sequence #\Space (rss:pub-date item))))
+	(make-instance 'sota-spot
+		       :comment description
+		       :callsign (first (split-sequence:split-sequence #\/ (first title-thing)))
+		       :area (first summit-thing)
+		       :summit (second summit-thing)
+		       :summit-url (concatenate 'string "http://www.sota.org.uk/Summit/" (first summit-thing) "/" (second summit-thing))
+		       :freq (with-input-from-string (in (fifth title-thing)) (read-number:read-float in))
+		       :mode (if (equal (length title-thing) 6)
+				 (sixth title-thing)
+				 "")
+		       :timestamp (local-time:parse-timestring (parse-rss-date timestamp-thing)))))
+
 (defmethod age ((s sota-spot))
   "Calculate the age of a SOTA spot in seconds."
   (- (local-time:timestamp-to-universal (local-time:now)) (local-time:timestamp-to-universal (timestamp s))))
@@ -171,7 +220,8 @@ spot page changes."
 (defmethod band ((s sota-spot))
   "Calculate the band (160m-2m), based on the frequency (for US
 bands). Returns the band as an integer. nil if it's lower than 160m,
-higher than 2m, or falls outside of a valid band."
+higher than 2m, or falls outside of a valid band. It's a little vague
+on 60M (to save code), but works fine in practice."
   (let ((f (freq s)))
     (cond
       ((and (>= f 1.8)
@@ -235,71 +285,84 @@ higher than 2m, or falls outside of a valid band."
 	  (freq s)
 	  (mode s)))
 
-(defun get-all-spots ()
-  "Return a list of all available SOTA spot objects."
-  (remove nil (mapcar (lambda (n) (make-sota-spot n)) (get-spots))))
+(defun get-all-spots-via-scraping ()
+  "Return a list of all available SOTA spot objects by scraping the
+sotawatch HTML."
+  (remove nil (mapcar (lambda (n) (make-sota-spot-from-scrape n)) (get-spots-from-scrape))))
 
-(defun show-spots (care max-age)
-  "Return a printed list of SOTA spots <= max-age (in seconds) where
-  the region matches one of a list of supplied regions ("W7W", etc)."
-  (mapcar
-   (lambda (n) (let ((m (make-sota-spot n)))
-		 (when (not (null m))
-		   (when (and
-			  (member (area m) care :test 'equal)
-			  (<= (age m) max-age))
-		     (pp m)))))
-   (get-spots))
-  t)
-
-(defun show-all-spots (max-age)
-  "Return a printed list of all available SOTA spots with age <=
-max-age (in seconds)."
-  (mapcar
-   (lambda (n) (let ((m (make-sota-spot n)))
-		 (when (and
-			(not (null m))
-			(<= (age m) max-age))
-		   (pp m))))
-   (get-spots))
-  t)
+(defun get-all-spots-via-rss ()
+  "Return a list of all available SOTA spot objects from the sotawatch
+RSS feed.."
+  (remove nil (mapcar (lambda (n) (make-sota-spot-from-rss-item n)) (get-spots-from-rss))))
 
 ; A SOTA peak object.
-(defclass sota-peak ()
-  ((peak-designator :accessor peak-designator
-		    :initarg :peak-designator
-		    :initform nil)
-   (peak-name :accessor peak-name
-	      :initarg :peak-name
-	      :initform nil)
+(defclass sota-peak (af:2d-point)
+  ((designator :accessor designator
+	       :initarg :designator
+	       :initform nil)
+   (name :accessor name
+	 :initarg :name
+	 :initform nil)
    (association :accessor association
 		:initarg :association
 		:initarg nil)
    (region :accessor region
 	   :initarg :region
-	   :initform nil)
-   (latitude :accessor latitude
-	     :initarg :latitude
-	     :initform nil)
-   (longitude :accessor longitude
-	      :initarg :longitude
-	      :initform nil)))
+	   :initform nil)))
 
 (defun make-sota-peak (thing)
   "Create a SOTA peak object out of parsed HTML. As with the above
 parsed HTML functions, this will break if/when the web page changes."
   (make-instance 'sota-peak
-		 :peak-designator (first (split-sequence:split-sequence #\, (second (second (second (second (second (third (third (second thing))))))))))
-		 :peak-name (second (second (second (second (second (third (third (second thing))))))))
+		 :designator (first (split-sequence:split-sequence #\, (second (second (second (second (second (third (third (second thing))))))))))
+		 :name (second (second (second (second (second (third (third (second thing))))))))
 		 :association (string-trim '(#\Space #\Tab #\Newline #\Linefeed) (third (third (second (third (third (second thing)))))))
 		 :region (string-trim '(#\Space #\Tab #\Newline #\Linefeed) (fifth (third (second (third (third (second thing)))))))
-		 :latitude (with-input-from-string (in (nth 8 (third (second (third (third (second thing))))))) (read in))
-		 :longitude (with-input-from-string (in (nth 10 (third (second (third (third (second thing))))))) (read in))))
+		 :lat (with-input-from-string (in (nth 8 (third (second (third (third (second thing))))))) (read in))
+		 :lon (with-input-from-string (in (nth 10 (third (second (third (third (second thing))))))) (read in))))
+
+(defmethod peak-serialize ((p sota-peak))
+  "Serialize a SOTA peak. This is for locally caching peak data
+instead of fetching it from the SOTA site repeatedly."
+  (append
+   (list
+    '(type sota-peak)
+    (list 'lat (point-lat p))
+    (list 'lon (point-lon p))
+    (list 'designator (designator p))
+    (list 'name (name p))
+    (list 'association (name p))
+    (list 'region (region p))
+    )
+   (af:point-metadata-serialize p)))
+
+(defmethod peak-deserialize-method ((p sota-peak) peak-data)
+  "Create a SOTA peak object from the data dumped by 'peak-serialize'.
+If the optional point-type value is supplied, the created object will
+be of that type. This is for locally caching peak data instead of
+fetching it from the SOTA site repeatedly."
+  (point-metadata-deserialize-method p peak-data)
+  (mapcar #'(lambda (n)
+	      (cond
+	       ((equal (first n) 'lat)
+		(setf (point-lat p) (second n)))
+	       ((equal (first n) 'lon)
+		(setf (point-lon p) (second n)))
+	       ((equal (first n) 'designator)
+		(setf (designator p) (second n)))
+	       ((equal (first n) 'name)
+		(setf (name p) (second n)))
+	       ((equal (first n) 'association)
+		(setf (association p) (second n)))
+	       ((equal (first n) 'region)
+		(setf (region p) (second n)))
+	       ))
+	  peak-data))
 
 (defmethod pp ((p sota-peak))
   "Pretty print a SOTA peak object."
   (format t "~A ~A ~A ~A ~A~%"
-	  (peak-designator p)
+	  (designator p)
 	  (association p)
 	  (region p)
 	  (latitude p)
@@ -319,7 +382,9 @@ nil."
 	       (when verbose (format t "New: ~A~%" (spot-hash-key n)))
 	       (setf (gethash (spot-hash-key n) *spots*) n))
 	     (when verbose (format t "Duplicate: ~A~%" (spot-hash-key n))))))
-     (get-all-spots))
+     (if *sota-rss*
+	 (get-all-spots-via-rss)
+	 (get-all-spots-via-scraping)))
     t))
 
 (defun grim-reaper (&optional (max-age *age-out*))

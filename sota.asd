@@ -5,9 +5,11 @@
   :author "Jeff Francis <jeff@gritch.org>"
   :license "MIT, see file LICENSE"
   :depends-on (#:drakma
+	       #:rss
 	       #:bordeaux-threads
 	       #:read-number
 	       #:local-time
+	       #:aviation-formulary
 	       #:split-sequence
                #:cl-html-parse)
   :serial t

@@ -15,6 +15,8 @@
 (defparameter *pref-bands* (list 80 60 40 30 20 20 17))
 (defparameter *pref-min-dist* 0)
 (defparameter *pref-max-dist* 1000)
+(defparameter *home-lat* 47.837578)
+(defparameter *home-lon* -122.1393)
 
 ; Load up the necessary credentials to send pushover messages. The two
 ; we care about are 'potoken' and 'pouser'.
@@ -69,7 +71,6 @@ spots that have already been sent. Example:
   (bt:with-lock-held (sota:*spot-lock*)
     (mapcar (lambda (n)
 	      (unless (null n)
-		;(print (sota:spot-hash-key (gethash n sota:*spots*)))
 		(if (equal (sota:mode (gethash n sota:*spots*)) "ssb")
 		    (send-pushover-message (sota:spot-hash-key (gethash n sota:*spots*)) :cosmic)
 		    (send-pushover-message (sota:spot-hash-key (gethash n sota:*spots*)) :spacealarm))))

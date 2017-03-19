@@ -23,7 +23,5 @@
 	   :processed
 	   :age
 	   :start-spotter
-	   :show-all-spots
-	   :show-spots
 	   :spot-hash-key
 	   :pp))
