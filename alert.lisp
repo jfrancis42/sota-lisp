@@ -57,7 +57,7 @@ spots that have already been sent. Example:
 			       t))
 		      (when process (setf (sota:processed (gethash n sota:*spots*)) t))
 		      n))	    
-		  (let ((keys nil)) (maphash (lambda (key value) (setf keys (cons key keys))) sota:*spots*) keys))))
+		  (let ((keys nil)) (maphash (lambda (key value) (declare (ignore value)) (setf keys (cons key keys))) sota:*spots*) keys))))
 
 (defun send-pushover-message (message sound)
   "Send the actual message to the user."

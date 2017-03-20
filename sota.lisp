@@ -9,9 +9,15 @@
 (defparameter *sota-rss* t) ; t to use RSS, nil to scrape the sotawatch HTML
 (defparameter *association-cache* nil)
 
+; (defun get-raw-url (url)
+;   "Fetch the data at the specified URL."
+;   (drakma:http-request url :method :get))
+
 (defun get-raw-url (url)
   "Fetch the data at the specified URL."
-  (drakma:http-request url :method :get))
+  (handler-case (drakma:http-request url :method :get)
+    (usocket:ns-host-not-found-error () "")
+    (usocket:ns-try-again-condition () "")))
 
 (defun get-parsed-url (url)
   "Fetch the data at the specified URL and parse it."
@@ -32,7 +38,7 @@ extract the bits we want to use."
 (defun get-spots-from-rss ()
   "Get the spots page from the SOTA RSS page, parse the result, then
 return list of parsed RSS entry objects."
-  (rss:items (rss:parse-rss-stream (drakma:http-request "http://old.sota.org.uk/RssFeed" :method :get))))
+  (rss:items (rss:parse-rss-stream (get-raw-url "http://old.sota.org.uk/RssFeed"))))
 
 (defun get-peak-from-scrape (summit-url)
   "Get the info on the specified SOTA peak and parse the result."
