@@ -9,10 +9,6 @@
 (defparameter *sota-rss* t) ; t to use RSS, nil to scrape the sotawatch HTML
 (defparameter *association-cache* nil)
 
-; (defun get-raw-url (url)
-;   "Fetch the data at the specified URL."
-;   (drakma:http-request url :method :get))
-
 (defun get-raw-url (url)
   "Fetch the data at the specified URL."
   (handler-case (drakma:http-request url :method :get)
