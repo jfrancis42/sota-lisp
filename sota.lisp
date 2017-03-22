@@ -8,10 +8,19 @@
 (defparameter *spot-lock* (bt:make-lock))
 (defparameter *sota-rss* t) ; t to use RSS, nil to scrape the sotawatch HTML
 (defparameter *association-cache* nil)
+(defparameter *last-successful-fetch* nil)
+
+(defun last-fetch-age ()
+  (if *last-successful-fetch*
+      (- (local-time:timestamp-to-unix (local-time:now)) (local-time:timestamp-to-unix *last-successful-fetch*))
+      nil))
 
 (defun get-raw-url (url)
   "Fetch the data at the specified URL."
-  (handler-case (drakma:http-request url :method :get)
+  (handler-case
+      (drakma:http-request url :method :get)
+    (usocket:host-unreachable-error () "")
+    (usocket:timeout-error () "")
     (usocket:ns-host-not-found-error () "")
     (usocket:ns-try-again-condition () "")))
 
@@ -82,7 +91,7 @@ return list of parsed RSS entry objects."
 		 ((equal (third thing) "Dec") "12"))
 	       "-" (second thing) "T"
 	       (fifth thing) "Z"))
-	       
+
 (defun get-associations ()
   "Return a list of all current associations (as specified by the SOTA
 mapping page) with their associated descriptions, with the association
@@ -157,7 +166,7 @@ actual date."
        (second (parse-scraped-date tomorrow-thing)))
       (t nil))))
 
-; A SOTA spot object.
+					; A SOTA spot object.
 (defclass sota-spot ()
   ((timestamp :accessor timestamp
 	      :initarg :timestamp
@@ -216,20 +225,23 @@ spot page changes."
 (defun make-sota-spot-from-rss-item (item)
   "Create a SOTA spot object from a parsed RSS item."
   (let* ((title-thing (split-sequence:split-sequence #\Space (rss:title item)))
+	 (callsign-thing (split-sequence:split-sequence #\/ (first title-thing)))
 	 (summit-thing (split-sequence:split-sequence #\/ (third title-thing)))
 	 (description (rss:description item))
 	 (timestamp-thing (split-sequence:split-sequence #\Space (rss:pub-date item))))
-	(make-instance 'sota-spot
-		       :comment description
-		       :callsign (first (split-sequence:split-sequence #\/ (first title-thing)))
-		       :area (first summit-thing)
-		       :summit (second summit-thing)
-		       :summit-url (concatenate 'string "http://www.sota.org.uk/Summit/" (first summit-thing) "/" (second summit-thing))
-		       :freq (with-input-from-string (in (fifth title-thing)) (read-number:read-float in))
-		       :mode (if (equal (length title-thing) 6)
-				 (sixth title-thing)
-				 "")
-		       :timestamp (local-time:parse-timestring (parse-rss-date timestamp-thing)))))
+    (make-instance 'sota-spot
+		   :comment description
+		   :callsign (string-upcase (if (equal 3 (length callsign-thing))
+						(second callsign-thing)
+						(first callsign-thing)))
+		   :area (first summit-thing)
+		   :summit (second summit-thing)
+		   :summit-url (concatenate 'string "http://www.sota.org.uk/Summit/" (first summit-thing) "/" (second summit-thing))
+		   :freq (with-input-from-string (in (fifth title-thing)) (read-number:read-float in))
+		   :mode (if (equal (length title-thing) 6)
+			     (sixth title-thing)
+			     "")
+		   :timestamp (local-time:parse-timestring (parse-rss-date timestamp-thing)))))
 
 (defmethod age ((s sota-spot))
   "Calculate the age of a SOTA spot in seconds."
@@ -313,7 +325,7 @@ sotawatch HTML."
 RSS feed.."
   (remove nil (mapcar (lambda (n) (make-sota-spot-from-rss-item n)) (get-spots-from-rss))))
 
-; A SOTA peak object.
+					; A SOTA peak object.
 (defclass sota-peak (af:2d-point)
   ((designator :accessor designator
 	       :initarg :designator
@@ -362,19 +374,19 @@ fetching it from the SOTA site repeatedly."
   (point-metadata-deserialize-method p peak-data)
   (mapcar #'(lambda (n)
 	      (cond
-	       ((equal (first n) 'lat)
-		(setf (point-lat p) (second n)))
-	       ((equal (first n) 'lon)
-		(setf (point-lon p) (second n)))
-	       ((equal (first n) 'designator)
-		(setf (designator p) (second n)))
-	       ((equal (first n) 'name)
-		(setf (name p) (second n)))
-	       ((equal (first n) 'association)
-		(setf (association p) (second n)))
-	       ((equal (first n) 'region)
-		(setf (region p) (second n)))
-	       ))
+		((equal (first n) 'lat)
+		 (setf (point-lat p) (second n)))
+		((equal (first n) 'lon)
+		 (setf (point-lon p) (second n)))
+		((equal (first n) 'designator)
+		 (setf (designator p) (second n)))
+		((equal (first n) 'name)
+		 (setf (name p) (second n)))
+		((equal (first n) 'association)
+		 (setf (association p) (second n)))
+		((equal (first n) 'region)
+		 (setf (region p) (second n)))
+		))
 	  peak-data))
 
 (defmethod pp ((p sota-peak))
@@ -391,32 +403,34 @@ fetching it from the SOTA site repeatedly."
 spots. If a given spot already exists, the data is discarded. If it's
 new, it's added to the hash with the processed field set to
 nil."
-  (bt:with-lock-held (*spot-lock*)
-    (mapcar
-     (lambda (n)
-       (unless (null n)
-	 (if (not (gethash (spot-hash-key n) *spots*))
-	     (progn
-	       (when verbose (format t "New: ~A~%" (spot-hash-key n)))
-	       (setf (gethash (spot-hash-key n) *spots*) n))
-	     (when verbose (format t "Duplicate: ~A~%" (spot-hash-key n))))))
-     (if *sota-rss*
-	 (get-all-spots-via-rss)
-	 (get-all-spots-via-scraping)))
-    t))
+  (let ((tmp-spots (if *sota-rss*
+		       (get-all-spots-via-rss)
+		       (get-all-spots-via-scraping))))
+    (when tmp-spots (setf *last-successful-fetch* (local-time:now)))
+    (bt:with-lock-held (*spot-lock*)
+      (mapcar
+       (lambda (n)
+	 (unless (null n)
+	   (if (not (gethash (spot-hash-key n) *spots*))
+	       (progn
+		 (when verbose (format t "New: ~A~%" (spot-hash-key n)))
+		 (setf (gethash (spot-hash-key n) *spots*) n))
+	       (when verbose (format t "Duplicate: ~A~%" (spot-hash-key n))))))
+       tmp-spots)))
+  t)
 
 (defun grim-reaper (&optional (max-age *age-out*))
   "Removes entries older than max-age seconds in the hash table."
-       (bt:with-lock-held (*spot-lock*)
-	 (mapcar
-	  (lambda (n) (remhash n *spots*))
-	  (let ((keys nil))
-	    (maphash
-	     (lambda (key value)
-	       (when (> (age value) max-age)
-		 (setf keys (cons key keys))))
-	     *spots*)
-	    keys))))
+  (bt:with-lock-held (*spot-lock*)
+    (mapcar
+     (lambda (n) (remhash n *spots*))
+     (let ((keys nil))
+       (maphash
+	(lambda (key value)
+	  (when (> (age value) max-age)
+	    (setf keys (cons key keys))))
+	*spots*)
+       keys))))
 
 (defun spot-fetcher-thread ()
   "This is the thread that runs forever, fetching data and maintaining

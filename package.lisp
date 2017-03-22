@@ -3,6 +3,7 @@
 (defpackage #:sota
   (:use #:cl)
   (:export :get-peak
+	   :last-fetch-age
 	   :show-association
 	   :get-association-list
 	   :get-association-alist
