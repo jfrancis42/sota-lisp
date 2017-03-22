@@ -42,8 +42,8 @@ as nil, this function will not set the processed flag in the spot
 objects (useful for taking a peek at the data) and will also display
 spots that have already been sent. Example:
 
-(get-my-spots 3600 *pref-assocs* *pref-bands* *pref-modes* nil)
-(get-my-spots 3600 (sota:get-association-list) *pref-bands* *pref-modes* nil)
+(get-my-spots *how-far-back* *pref-assocs* *pref-bands* *pref-modes* nil)
+(get-my-spots *how-far-back* (sota:get-association-list) *pref-bands* *pref-modes* nil)
 "
   (remove nil
 	  (mapcar (lambda (n)

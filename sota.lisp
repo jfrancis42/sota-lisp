@@ -435,8 +435,6 @@ nil."
 (defun spot-fetcher-thread ()
   "This is the thread that runs forever, fetching data and maintaining
 the spot hash."
-  (bt:with-lock-held (*spot-lock*)
-    (setf *spots* (make-hash-table :test #'equal)))
   (loop
      (update-spots)
      (grim-reaper *age-out*)
