@@ -47,3 +47,7 @@ This function calls sota:start-spotter itself, then starts a thread to start pol
 That's it. As long as you don't close the REPL, it should run forever.
 
 Future enhancements will include being able to filter based on frequency/band, mode, and distance to the activated peak. Basic support for most of this has already been built, it's just a matter of completing the front-end code. I also intend to add the ability to post spots and alerts using this library. I've been experimenting with adding a RESTful API, as well, allowing for easy access from any kind of code. This would allow providing a SOTA API as a service. But I'll have a chat with the SOTA guys before I make any plans for offering this as a public service.
+
+## ToDo
+
+* Still doesn't recover properly from many network failures.

@@ -215,7 +215,9 @@ spot page changes."
 		       :comment (second (second (third (third thing))))
 		       :callsign (string-upcase (if (equal 3 (length callsign-thing))
 						    (second callsign-thing)
-						    (first callsign-thing)))
+						    (if (> (length (first callsign-thing)) (length (second callsign-thing)))
+							(first callsign-thing)
+							(second callsign-thing))))
 		       :summit (second summit-thing)
 		       :summit-url (fifth (first (fourth (third (second thing)))))
 		       :area (first summit-thing)
@@ -233,7 +235,9 @@ spot page changes."
 		   :comment description
 		   :callsign (string-upcase (if (equal 3 (length callsign-thing))
 						(second callsign-thing)
-						(first callsign-thing)))
+						(if (> (length (first callsign-thing)) (length (second callsign-thing)))
+						    (first callsign-thing)
+						    (second callsign-thing))))
 		   :area (first summit-thing)
 		   :summit (second summit-thing)
 		   :summit-url (concatenate 'string "http://www.sota.org.uk/Summit/" (first summit-thing) "/" (second summit-thing))
@@ -315,7 +319,7 @@ on 60M (to save code), but works fine in practice."
 	  (freq s)
 	  (mode s)))
 
-(defun get-all-spots-via-scraping ()
+(defun get-all-spots-via-scrape ()
   "Return a list of all available SOTA spot objects by scraping the
 sotawatch HTML."
   (remove nil (mapcar (lambda (n) (make-sota-spot-from-scrape n)) (get-spots-from-scrape))))
@@ -405,7 +409,7 @@ new, it's added to the hash with the processed field set to
 nil."
   (let ((tmp-spots (if *sota-rss*
 		       (get-all-spots-via-rss)
-		       (get-all-spots-via-scraping))))
+		       (get-all-spots-via-scrape))))
     (when tmp-spots (setf *last-successful-fetch* (local-time:now)))
     (bt:with-lock-held (*spot-lock*)
       (mapcar

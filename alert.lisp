@@ -11,7 +11,7 @@
 ; running (sota:get-association-list)."
 (defparameter *how-far-back* 3600)
 (defparameter *pref-assocs* (list "VE7" "W0C" "W5N" "W6" "W7I" "W7M" "W7N" "W7O" "W7U" "W7Y" "W7A" "KLA" "KLF" "KLS"))
-(defparameter *pref-modes* (list "cw" "am" "ssb"))
+(defparameter *pref-modes* (list "cw" "ssb"))
 (defparameter *pref-bands* (list 80 60 40 30 20 17))
 (defparameter *pref-min-dist* 0)
 (defparameter *pref-max-dist* 1000)
@@ -22,7 +22,7 @@
 ; we care about are 'potoken' and 'pouser'.
 (creds:load-creds)
 
-; This "holds" the alert thread that runs forever.
+; This holds the reference to the alert thread that runs forever.
 (defparameter *alert-thread* nil)
 
 (defun print-spot (spot)
