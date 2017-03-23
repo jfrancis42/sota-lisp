@@ -4,6 +4,7 @@
 
 (defparameter *age-out* 86400)
 (defparameter *spots* (make-hash-table :test #'equal))
+(defparameter *end-spot-thread* nil)
 (defparameter *spot-thread* nil)
 (defparameter *spot-lock* (bt:make-lock))
 (defparameter *sota-rss* t) ; t to use RSS, nil to scrape the sotawatch HTML
@@ -442,11 +443,28 @@ the spot hash."
   (loop
      (update-spots)
      (grim-reaper *age-out*)
-     (sleep 60)))
+     (loop for x from 1 to 10 collect
+	  (progn 
+	    (when *end-spot-thread* (return t))
+	    (sleep 6)))))
+
+(defun spotter-state ()
+  "Check the state of the spotter thread."
+  (if (bt:thread-alive-p *spot-thread*)
+      t
+      nil))
+
+(defun stop-spotter ()
+  "Stop the spotter thread."
+  (print "Stopping spot thread...")
+  (setf *end-spot-thread* t)
+  (bt:join-thread *spot-thread*))
 
 (defun start-spotter ()
   "Start the spotter thread."
-  (setf *association-cache* (get-associations))
-  (setf *spot-thread* (bt:make-thread
-		       (lambda () (spot-fetcher-thread))
-		       :name "sota-spots")))
+  (unless (ignore-errors (sota:spotter-state))
+    (setf *association-cache* (get-associations))
+    (setf *end-spot-thread* nil)
+    (setf *spot-thread* (bt:make-thread
+			 (lambda () (spot-fetcher-thread))
+			 :name "sota-spots"))))

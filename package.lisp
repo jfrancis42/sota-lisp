@@ -25,6 +25,8 @@
 	   :mode
 	   :processed
 	   :age
+	   :spotter-state
 	   :start-spotter
+	   :stop-spotter
 	   :spot-hash-key
 	   :pp))

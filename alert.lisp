@@ -9,7 +9,9 @@
 ; these regions because that's all I can hear, anyway. YMMV. You can
 ; get a list of all the regions by loading the sota package and
 ; running (sota:get-association-list)."
+(defparameter *verbose* nil)
 (defparameter *how-far-back* 3600)
+(defparameter *end-alert-thread* nil)
 (defparameter *pref-assocs* (list "VE7" "W0C" "W5N" "W6" "W7I" "W7M" "W7N" "W7O" "W7U" "W7Y" "W7A" "KLA" "KLF" "KLS"))
 (defparameter *pref-modes* (list "cw" "ssb"))
 (defparameter *pref-bands* (list 80 60 40 30 20 17))
@@ -72,6 +74,7 @@ spots that have already been sent. Example:
   (bt:with-lock-held (sota:*spot-lock*)
     (mapcar (lambda (n)
 	      (unless (null n)
+		(when *verbose* (print (sota:spot-hash-key (gethash n sota:*spots*))))
 		(if (equal (sota:mode (gethash n sota:*spots*)) "ssb")
 		    (send-pushover-message (sota:spot-hash-key (gethash n sota:*spots*)) :cosmic)
 		    (send-pushover-message (sota:spot-hash-key (gethash n sota:*spots*)) :spacealarm))))
@@ -82,8 +85,15 @@ spots that have already been sent. Example:
 one as sent once it's passed to pushover)."
   (setf sota:*spots* (make-hash-table :test #'equal))
   (loop
+     (when *end-alert-thread* (return t))
      (send-new-spots *pref-assocs* *pref-bands* *pref-modes*)
      (sleep 60)))
+
+(defun stop-alerts ()
+  "Stop the spotter thread."
+  (print "Stopping alert thread...")
+  (setf *end-alert-thread* t)
+  (bt:join-thread *alert-thread*))
 
 (defun start-alerts ()
   "Start the spotter thread."
@@ -99,4 +109,5 @@ one as sent once it's passed to pushover)."
 
 (defun make-bin ()
   "Write a an executable compiled version of the code to disk."
+  (setf *verbose* t)
   (sb-ext:save-lisp-and-die "sota-alerts" :toplevel #'start-bin :executable t :purify t :compression 9))
