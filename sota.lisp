@@ -7,7 +7,6 @@
 (defparameter *end-spot-thread* nil)
 (defparameter *spot-thread* nil)
 (defparameter *spot-lock* (bt:make-lock))
-(defparameter *sota-rss* t) ; t to use RSS, nil to scrape the sotawatch HTML
 (defparameter *association-cache* nil)
 (defparameter *last-successful-fetch* nil)
 
@@ -403,24 +402,23 @@ fetching it from the SOTA site repeatedly."
 	  (latitude p)
 	  (longitude p)))
 
-(defun update-spots (&optional (verbose nil))
+(defun update-spots (mode)
   "This function uses the sota package to build/update a hash of
 spots. If a given spot already exists, the data is discarded. If it's
 new, it's added to the hash with the processed field set to
-nil."
-  (let ((tmp-spots (if *sota-rss*
-		       (get-all-spots-via-rss)
-		       (get-all-spots-via-scrape))))
+nil. The mode flag should be either :rss or :html."
+  (let ((tmp-spots (cond
+		     ((equal :rss mode)
+		      (get-all-spots-via-rss))
+		     ((equal :html mode)
+		      (get-all-spots-via-scrape)))))
     (when tmp-spots (setf *last-successful-fetch* (local-time:now)))
     (bt:with-lock-held (*spot-lock*)
       (mapcar
        (lambda (n)
 	 (unless (null n)
-	   (if (not (gethash (spot-hash-key n) *spots*))
-	       (progn
-		 (when verbose (format t "New: ~A~%" (spot-hash-key n)))
-		 (setf (gethash (spot-hash-key n) *spots*) n))
-	       (when verbose (format t "Duplicate: ~A~%" (spot-hash-key n))))))
+	   (when (not (gethash (spot-hash-key n) *spots*))
+	     (setf (gethash (spot-hash-key n) *spots*) n))))
        tmp-spots)))
   t)
 
@@ -437,16 +435,16 @@ nil."
 	*spots*)
        keys))))
 
-(defun spot-fetcher-thread ()
+(defun spot-fetcher-thread (mode)
   "This is the thread that runs forever, fetching data and maintaining
 the spot hash."
   (loop
-     (update-spots)
      (grim-reaper *age-out*)
      (loop for x from 1 to 10 collect
 	  (progn 
 	    (when *end-spot-thread* (return t))
-	    (sleep 6)))))
+	    (sleep 6)))
+     (update-spots mode)))
 
 (defun spotter-state ()
   "Check the state of the spotter thread."
@@ -460,11 +458,14 @@ the spot hash."
   (setf *end-spot-thread* t)
   (bt:join-thread *spot-thread*))
 
-(defun start-spotter ()
-  "Start the spotter thread."
+(defun start-spotter (mode)
+  "Start the spotter thread. Always do a full HTML scrape before
+starting the thread, no matter what mode is selected (in order to
+fully populate the hash)."
   (unless (ignore-errors (sota:spotter-state))
     (setf *association-cache* (get-associations))
     (setf *end-spot-thread* nil)
+    (update-spots :html)
     (setf *spot-thread* (bt:make-thread
-			 (lambda () (spot-fetcher-thread))
+			 (lambda () (spot-fetcher-thread mode))
 			 :name "sota-spots"))))

@@ -97,14 +97,14 @@ one as sent once it's passed to pushover)."
 
 (defun start-alerts ()
   "Start the spotter thread."
-  (sota:start-spotter)
+  (sota:start-spotter :rss)
   (setf *alert-thread* (bt:make-thread
 			(lambda () (send-new-spots-thread))
 			:name "sota-alert")))
 
 (defun start-bin ()
   "Start the spotter thread (used only when creating a binary)."
-  (sota:start-spotter)
+  (sota:start-spotter :rss)
   (send-new-spots-thread))
 
 (defun make-bin ()
