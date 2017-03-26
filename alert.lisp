@@ -107,7 +107,8 @@ one as sent once it's passed to pushover)."
   (sota:start-spotter :rss)
   (send-new-spots-thread))
 
-(defun make-bin ()
-  "Write a an executable compiled version of the code to disk."
+(defun make-bin (name)
+  "Write a an executable compiled version of the code to disk with the
+specified name."
   (setf *verbose* t)
-  (sb-ext:save-lisp-and-die "sota-alerts" :toplevel #'start-bin :executable t :purify t :compression 9))
+  (sb-ext:save-lisp-and-die name :toplevel #'start-bin :executable t :purify t :compression 9))
