@@ -104,11 +104,11 @@ one as sent once it's passed to pushover)."
 
 (defun start-bin ()
   "Start the spotter thread (used only when creating a binary)."
+  (setf *verbose* t)
   (sota:start-spotter :rss)
   (send-new-spots-thread))
 
 (defun make-bin (name)
   "Write a an executable compiled version of the code to disk with the
 specified name."
-  (setf *verbose* t)
   (sb-ext:save-lisp-and-die name :toplevel #'start-bin :executable t :purify t :compression 9))
