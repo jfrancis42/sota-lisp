@@ -50,4 +50,6 @@ Future enhancements will include things like being able to filter based on the d
 
 ## ToDo
 
-* Still doesn't recover properly from many network failures.
+* Still doesn't recover properly from many network failures. Fix.
+* Add support to automatically tune radio to new spots via FLDigi.
+* Barfs on some data. Included bad.rss.html file with an example (last item). Appears to fail due to the "\&amp;" between the call signs. In the mean time, wrapped it in a (ignore-errors ), but that's ver definitely the wrong way to do it. Fix.
