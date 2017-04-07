@@ -342,17 +342,19 @@ on 60M (to save code), but works fine in practice."
 
 (defun serialize-spots-to-file (spots filename)
   "Write a list of spots to a file."
-  (with-open-file
-   (file-handle filename :direction :output :if-does-not-exist :create :if-exists :supersede)
-		  (maphash
-		   #'(lambda (key value)
-		       (format file-handle "~A~%" (sota-spot-serialize value)))
-		   spots)))
+  (bt:with-lock-held (*spot-lock*)
+    (with-open-file
+	(file-handle filename :direction :output :if-does-not-exist :create :if-exists :supersede)
+      (maphash
+       #'(lambda (key value)
+	   (format file-handle "~A~%" (sota-spot-serialize value)))
+       spots))))
 
 (defun deserialize-spots-from-file (filename)
   "Read in a list of spots from a file."
-  ;(setf *spots* (make-hash-table :test #'equal))
-  (load filename))
+  (bt:with-lock-held (*spot-lock*)
+    ;(setf *spots* (make-hash-table :test #'equal))
+    (load filename)))
 
 (defun get-all-spots-via-scrape ()
   "Return a list of all available SOTA spot objects by scraping the
