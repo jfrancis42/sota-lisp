@@ -4,9 +4,11 @@
 
 (defvar *age-out* 86400)
 (defvar *spots* (make-hash-table :test #'equal))
+(defvar *peaks* (make-hash-table :test #'equal))
 (defvar *end-spot-thread* nil)
 (defvar *spot-thread* nil)
 (defvar *spot-lock* (bt:make-lock))
+(defvar *peak-lock* (bt:make-lock))
 (defvar *association-cache* nil)
 (defvar *last-successful-fetch* nil)
 
@@ -340,7 +342,7 @@ on 60M (to save code), but works fine in practice."
 	  (mode s)
 	  (processed s)))
 
-(defun serialize-spots-to-file (spots filename)
+(defun serialize-spots-to-file (filename)
   "Write a list of spots to a file."
   (bt:with-lock-held (*spot-lock*)
     (with-open-file
@@ -348,7 +350,7 @@ on 60M (to save code), but works fine in practice."
       (maphash
        #'(lambda (key value)
 	   (format file-handle "~A~%" (sota-spot-serialize value)))
-       spots))))
+       *spots*))))
 
 (defun deserialize-spots-from-file (filename)
   "Read in a list of spots from a file."
@@ -368,12 +370,15 @@ RSS feed.."
 
 					; A SOTA peak object.
 (defclass sota-peak (af:2d-point)
-  ((designator :accessor designator
-	       :initarg :designator
-	       :initform nil)
+  ((summit-url :accessor summit-url
+	       :initarg :summit-url
+	       :initarg nil)
    (name :accessor name
 	 :initarg :name
 	 :initform nil)
+   (designator :accessor designator
+	       :initarg :designator
+	       :initform nil)
    (association :accessor association
 		:initarg :association
 		:initarg nil)
@@ -381,16 +386,58 @@ RSS feed.."
 	   :initarg :region
 	   :initform nil)))
 
-(defun make-sota-peak (thing)
+(defun make-sota-peak (thing summit-url)
   "Create a SOTA peak object out of parsed HTML. As with the above
 parsed HTML functions, this will break if/when the web page changes."
   (make-instance 'sota-peak
+		 :summit-url summit-url
 		 :designator (first (split-sequence:split-sequence #\, (second (second (second (second (second (third (third (second thing))))))))))
 		 :name (second (second (second (second (second (third (third (second thing))))))))
 		 :association (string-trim '(#\Space #\Tab #\Newline #\Linefeed) (third (third (second (third (third (second thing)))))))
 		 :region (string-trim '(#\Space #\Tab #\Newline #\Linefeed) (fifth (third (second (third (third (second thing)))))))
 		 :lat (with-input-from-string (in (nth 8 (third (second (third (third (second thing))))))) (read in))
 		 :lon (with-input-from-string (in (nth 10 (third (second (third (third (second thing))))))) (read in))))
+
+(defmethod get-sota-peak ((s sota-spot))
+  "Get peak information for a given spot."
+  (bt:with-lock-held (*peak-lock*)
+    (let ((url (summit-url s)))
+      (if (gethash url *peaks*)
+	  (gethash url *peaks*)
+	  (progn
+	    (setf (gethash url *peaks*) (make-sota-peak (get-peak-from-scrape url) url))
+	    (gethash url *peaks*))))))
+
+(defun get-peak-by-designator (area summit)
+  (get-sota-peak
+   (make-instance 'sota-spot :summit-url (concatenate 'string "http://www.sota.org.uk/Summit/" area "/" summit))))
+
+(defmethod sota-peak-serialize ((s sota-peak))
+  "Serialize a sota-peak object."
+  (format nil "(setf (gethash \"~A\" sota:*peaks*) (make-instance 'sota::sota-peak :name \"~A\" :point-lat ~A :point-lon ~A :designator \"~A\" :association \"~A\" :region \"~A\"))"
+	  (summit-url s)
+	  (name s)
+	  (af:point-lat s)
+	  (af:point-lon s)
+	  (designator s)
+	  (association s)
+	  (region s)))
+
+(defun serialize-peaks-to-file (filename)
+  "Write a list of peaks to a file."
+  (bt:with-lock-held (*peak-lock*)
+    (with-open-file
+	(file-handle filename :direction :output :if-does-not-exist :create :if-exists :supersede)
+      (maphash
+       #'(lambda (key value)
+	   (format file-handle "~A~%" (sota-peak-serialize value)))
+       *peaks*))))
+
+(defun deserialize-peaks-from-file (filename)
+  "Read in a list of peaks from a file."
+  (bt:with-lock-held (*peak-lock*)
+    ;(setf *peaks* (make-hash-table :test #'equal))
+    (load filename)))
 
 (defmethod pp ((p sota-peak))
   "Pretty print a SOTA peak object."
