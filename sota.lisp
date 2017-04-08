@@ -524,7 +524,7 @@ the spot hash."
 starting the thread, no matter what mode is selected (in order to
 fully populate the hash, as the RSS feed only contains the last ten
 spots)."
-  (unless (ignore-errors (sota:spotter-state))
+  (unless (ignore-errors (spot-state))
     (setf *stop-threads* nil)
     (setf *association-cache* (get-associations))
     (deserialize-peaks-from-file *peaks-cache*)
