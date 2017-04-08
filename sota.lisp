@@ -5,8 +5,8 @@
 (defvar *age-out* 86400)
 (defvar *spots* (make-hash-table :test #'equal))
 (defvar *peaks* (make-hash-table :test #'equal))
-(defvar *end-spot-thread* nil)
-(defvar *peaks-thread* nil)
+(defvar *stop-threads* nil)
+(defvar *peak-thread* nil)
 (defvar *spot-thread* nil)
 (defvar *spot-lock* (bt:make-lock))
 (defvar *peak-lock* (bt:make-lock))
@@ -400,9 +400,10 @@ parsed HTML functions, this will break if/when the web page changes."
 
 (defmethod sota-peak-serialize ((s sota-peak))
   "Serialize a sota-peak object."
-  (format nil "(setf (gethash \"~A\" sota:*peaks*) (make-instance 'sota::sota-peak :name \"~A\" :lat ~A :lon ~A :designator \"~A\" :association \"~A\" :region \"~A\"))"
+  (format nil "(setf (gethash \"~A\" sota:*peaks*) (make-instance 'sota::sota-peak :summit-url \"~A\" :name \"~A\" :lat ~A :lon ~A :designator \"~A\" :association \"~A\" :region \"~A\"))"
 	  (summit-url s)
-	  (name s)
+	  (summit-url s)
+	  (point-name s)
 	  (af:point-lat s)
 	  (af:point-lon s)
 	  (designator s)
@@ -433,8 +434,7 @@ parsed HTML functions, this will break if/when the web page changes."
 	  (gethash url *peaks*)
 	  (progn
 	    (setf (gethash url *peaks*) (make-sota-peak (get-peak-from-scrape url) url))
-	    (gethash url *peaks*)))))
-  (serialize-peaks-to-file *peaks-cache*))
+	    (gethash url *peaks*))))))
 
 (defun get-peak-by-designator (area summit)
   (get-sota-peak
@@ -483,11 +483,11 @@ nil. The mode flag should be either :rss or :html."
        keys))))
 
 (defun peak-cache-thread ()
-  "Periodically saves the peak cache."
+  "Periodically saves the peak cache to disk."
   (loop
      (sleep *peak-thread-sleep*)
-     (bt:with-lock-held (*peak-lock*)
-       (serialize-peaks-to-file *peak-thread-sleep*))))
+     (serialize-peaks-to-file *peaks-cache*)
+     (when *stop-threads* (return t))))
 
 (defun spot-fetcher-thread (mode)
   "This is the thread that runs forever, fetching data and maintaining
@@ -496,20 +496,27 @@ the spot hash."
      (grim-reaper *age-out*)
      (loop for x from 1 to 10 collect
 	  (progn 
-	    (when *end-spot-thread* (return t))
+	    (when *stop-threads* (return t))
 	    (sleep 6)))
      (update-spots mode)))
 
-(defun spotter-state ()
+(defun peak-state ()
+  "Check the state of the peak thread."
+  (if (bt:thread-alive-p *peak-thread*)
+      t
+      nil))
+
+(defun spot-state ()
   "Check the state of the spotter thread."
   (if (bt:thread-alive-p *spot-thread*)
       t
       nil))
 
-(defun stop-spotter ()
-  "Stop the spotter thread."
-  (print "Stopping spot thread...")
-  (setf *end-spot-thread* t)
+(defun stop-threads ()
+  "Stop all threads."
+  (print "Stopping threads...")
+  (setf *stop-threads* t)
+  (bt:join-thread *peak-thread*)
   (bt:join-thread *spot-thread*))
 
 (defun start-spotter (mode)
@@ -518,7 +525,7 @@ starting the thread, no matter what mode is selected (in order to
 fully populate the hash, as the RSS feed only contains the last ten
 spots)."
   (unless (ignore-errors (sota:spotter-state))
-    (setf *end-spot-thread* nil)
+    (setf *stop-threads* nil)
     (setf *association-cache* (get-associations))
     (deserialize-peaks-from-file *peaks-cache*)
     (setf *peak-thread* (bt:make-thread

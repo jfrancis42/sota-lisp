@@ -2,6 +2,13 @@
 
 (defpackage #:sota
   (:use #:cl)
+  (:import-from :aviation-formulary
+		:point-serial-number
+		:point-creation-time
+		:point-name
+		:point-lat
+		:point-lon
+		:point-datum)
   (:export :get-peak
 	   :last-fetch-age
 	   :show-association
@@ -29,8 +36,9 @@
 	   :mode
 	   :processed
 	   :age
-	   :spotter-state
+	   :spot-state
+	   :peak-state
 	   :start-spotter
-	   :stop-spotter
+	   :stop-threads
 	   :spot-hash-key
 	   :pp))
