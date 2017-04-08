@@ -50,6 +50,10 @@ Future enhancements will include things like being able to filter based on the d
 
 ## ToDo
 
-* Still doesn't recover properly from many network failures. Fix.
+* Still doesn't recover properly from some network failures. Fix.
 * Add support to automatically tune radio to new spots via FLDigi.
-* Barfs on some data. Included bad.rss.html file with an example (last item). Appears to fail due to the "\&amp;" between the call signs. In the mean time, wrapped it in a (ignore-errors ), but that's ver definitely the wrong way to do it. Fix.
+* Barfs on some input data. Included bad.rss.html file with an example (last entry in the file). Appears to fail due to the "\& amp;" between the call signs. In the mean time, wrapped it in a (ignore-errors ), but that's very definitely the wrong way to do it. Fix.
+* The code that caches the fetched peak data seems to barf on unicode characters. May the inventors of unicode burn in unquenchable fire for ever and ever, amen. Fix.
+* Add logging to files.
+* Be smart about looking for peak cache files.
+* Don't crash for a missing cache file.
