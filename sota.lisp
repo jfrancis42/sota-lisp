@@ -6,11 +6,14 @@
 (defvar *spots* (make-hash-table :test #'equal))
 (defvar *peaks* (make-hash-table :test #'equal))
 (defvar *end-spot-thread* nil)
+(defvar *peaks-thread* nil)
 (defvar *spot-thread* nil)
 (defvar *spot-lock* (bt:make-lock))
 (defvar *peak-lock* (bt:make-lock))
 (defvar *association-cache* nil)
 (defvar *last-successful-fetch* nil)
+(defvar *peaks-cache* "peaks.cache")
+(defvar *peak-thread-sleep* 60)
 
 (defun last-fetch-age ()
   (if *last-successful-fetch*
@@ -373,9 +376,6 @@ RSS feed.."
   ((summit-url :accessor summit-url
 	       :initarg :summit-url
 	       :initarg nil)
-   (name :accessor name
-	 :initarg :name
-	 :initform nil)
    (designator :accessor designator
 	       :initarg :designator
 	       :initform nil)
@@ -398,23 +398,9 @@ parsed HTML functions, this will break if/when the web page changes."
 		 :lat (with-input-from-string (in (nth 8 (third (second (third (third (second thing))))))) (read in))
 		 :lon (with-input-from-string (in (nth 10 (third (second (third (third (second thing))))))) (read in))))
 
-(defmethod get-sota-peak ((s sota-spot))
-  "Get peak information for a given spot."
-  (bt:with-lock-held (*peak-lock*)
-    (let ((url (summit-url s)))
-      (if (gethash url *peaks*)
-	  (gethash url *peaks*)
-	  (progn
-	    (setf (gethash url *peaks*) (make-sota-peak (get-peak-from-scrape url) url))
-	    (gethash url *peaks*))))))
-
-(defun get-peak-by-designator (area summit)
-  (get-sota-peak
-   (make-instance 'sota-spot :summit-url (concatenate 'string "http://www.sota.org.uk/Summit/" area "/" summit))))
-
 (defmethod sota-peak-serialize ((s sota-peak))
   "Serialize a sota-peak object."
-  (format nil "(setf (gethash \"~A\" sota:*peaks*) (make-instance 'sota::sota-peak :name \"~A\" :point-lat ~A :point-lon ~A :designator \"~A\" :association \"~A\" :region \"~A\"))"
+  (format nil "(setf (gethash \"~A\" sota:*peaks*) (make-instance 'sota::sota-peak :name \"~A\" :lat ~A :lon ~A :designator \"~A\" :association \"~A\" :region \"~A\"))"
 	  (summit-url s)
 	  (name s)
 	  (af:point-lat s)
@@ -438,6 +424,21 @@ parsed HTML functions, this will break if/when the web page changes."
   (bt:with-lock-held (*peak-lock*)
     ;(setf *peaks* (make-hash-table :test #'equal))
     (load filename)))
+
+(defmethod get-sota-peak ((s sota-spot))
+  "Get peak information for a given spot."
+  (bt:with-lock-held (*peak-lock*)
+    (let ((url (summit-url s)))
+      (if (gethash url *peaks*)
+	  (gethash url *peaks*)
+	  (progn
+	    (setf (gethash url *peaks*) (make-sota-peak (get-peak-from-scrape url) url))
+	    (gethash url *peaks*)))))
+  (serialize-peaks-to-file *peaks-cache*))
+
+(defun get-peak-by-designator (area summit)
+  (get-sota-peak
+   (make-instance 'sota-spot :summit-url (concatenate 'string "http://www.sota.org.uk/Summit/" area "/" summit))))
 
 (defmethod pp ((p sota-peak))
   "Pretty print a SOTA peak object."
@@ -481,6 +482,13 @@ nil. The mode flag should be either :rss or :html."
 	*spots*)
        keys))))
 
+(defun peak-cache-thread ()
+  "Periodically saves the peak cache."
+  (loop
+     (sleep *peak-thread-sleep*)
+     (bt:with-lock-held (*peak-lock*)
+       (serialize-peaks-to-file *peak-thread-sleep*))))
+
 (defun spot-fetcher-thread (mode)
   "This is the thread that runs forever, fetching data and maintaining
 the spot hash."
@@ -507,10 +515,15 @@ the spot hash."
 (defun start-spotter (mode)
   "Start the spotter thread. Always do a full HTML scrape before
 starting the thread, no matter what mode is selected (in order to
-fully populate the hash)."
+fully populate the hash, as the RSS feed only contains the last ten
+spots)."
   (unless (ignore-errors (sota:spotter-state))
-    (setf *association-cache* (get-associations))
     (setf *end-spot-thread* nil)
+    (setf *association-cache* (get-associations))
+    (deserialize-peaks-from-file *peaks-cache*)
+    (setf *peak-thread* (bt:make-thread
+			 (lambda () (peak-cache-thread))
+			 :name "sota-peaks"))
     (update-spots :html)
     (setf *spot-thread* (bt:make-thread
 			 (lambda () (spot-fetcher-thread mode))
