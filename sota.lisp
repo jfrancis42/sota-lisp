@@ -526,12 +526,18 @@ fully populate the hash, as the RSS feed only contains the last ten
 spots)."
   (unless (ignore-errors (spot-state))
     (setf *stop-threads* nil)
+    (print "Fetching associations from web...")
     (setf *association-cache* (get-associations))
+    (print "Loading peak cache data from disk...")
     (deserialize-peaks-from-file *peaks-cache*)
+    (print "Starting peak thread...")
     (setf *peak-thread* (bt:make-thread
 			 (lambda () (peak-cache-thread))
 			 :name "sota-peaks"))
+    (print "Fetching initial spot data from web...")
     (update-spots :html)
+    (print "Starting spot thread...")
     (setf *spot-thread* (bt:make-thread
 			 (lambda () (spot-fetcher-thread mode))
-			 :name "sota-spots"))))
+			 :name "sota-spots"))
+    (print "Ready.")))

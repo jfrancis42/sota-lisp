@@ -1,4 +1,7 @@
 .DS_Store
 misc.lisp
 sota-alerts*
+bin/*
+misc/fldigi.lisp
+misc/peaks.cache.*
 
