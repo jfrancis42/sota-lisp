@@ -2,7 +2,7 @@
 (ql:quickload :creds)
 (ql:quickload :pushover)
 
-; These are paremeters you might want to fiddle with. The first is
+; These are parameters you might want to fiddle with. The first is
 ; probably fine as-is (how far back in time to go for the first
 ; pass). The second parameter (*pref-assocs*), you'll probably want to
 ; tweak to your taste. With my crappy antenna, I limit results to
