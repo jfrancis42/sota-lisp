@@ -13,7 +13,7 @@
 (defparameter *how-far-back* 3600)
 (defparameter *end-alert-thread* nil)
 (defparameter *pref-assocs* (list "VE7" "W0C" "W5N" "W6" "W7I" "W7M" "W7N" "W7O" "W7U" "W7Y" "W7A" "KLA" "KLF" "KLS"))
-(defparameter *pref-modes* (list "cw" "ssb"))
+(defparameter *pref-modes* (list "ssb" "cw"))
 (defparameter *pref-bands* (list 80 60 40 30 20 17))
 (defparameter *pref-min-dist* 0)
 (defparameter *pref-max-dist* 1000)
@@ -48,18 +48,34 @@ spots that have already been sent. Example:
 (get-my-spots *how-far-back* (sota:get-association-list) *pref-bands* *pref-modes* nil)
 "
   (remove nil
-	  (mapcar (lambda (n)
-		    (when (and
-			   (member (sota:area (gethash n sota:*spots*)) regions :test 'equal)
-			   (member (sota:mode (gethash n sota:*spots*)) modes :test 'equal)
-			   (member (sota:band (gethash n sota:*spots*)) bands)
-			   (<= (sota:age (gethash n sota:*spots*)) max-age)
-			   (if process
-			       (not (sota:processed (gethash n sota:*spots*)))
-			       t))
-		      (when process (setf (sota:processed (gethash n sota:*spots*)) t))
-		      n))	    
-		  (let ((keys nil)) (maphash (lambda (key value) (declare (ignore value)) (setf keys (cons key keys))) sota:*spots*) keys))))
+	  (mapcar
+	   (lambda (n)
+	     (when (and
+		    (member
+		     (sota:area (gethash n sota:*spots*))
+		     regions :test 'equal)
+		    (member
+		     (sota:mode (gethash n sota:*spots*))
+		     modes :test 'equal)
+		    (member
+		     (sota:band (gethash n sota:*spots*))
+		     bands)
+		    (<=
+		     (sota:age (gethash n sota:*spots*))
+		     max-age)
+		    (if process
+			(not (sota:processed (gethash n sota:*spots*)))
+			t))
+	       (when process
+		 (setf (sota:processed (gethash n sota:*spots*)) t))
+	       n))	    
+	   (let ((keys nil))
+	     (maphash
+	      (lambda (key value)
+		(declare (ignore value))
+		(setf keys (cons key keys)))
+	      sota:*spots*)
+	     keys))))
 
 (defun send-pushover-message (message sound)
   "Send the actual message to the user."
@@ -74,10 +90,15 @@ spots that have already been sent. Example:
   (bt:with-lock-held (sota:*spot-lock*)
     (mapcar (lambda (n)
 	      (unless (null n)
-		(when *verbose* (print (sota:spot-hash-key (gethash n sota:*spots*))))
+		(when *verbose*
+		  (print (sota:spot-hash-key (gethash n sota:*spots*))))
 		(if (equal (sota:mode (gethash n sota:*spots*)) "ssb")
-		    (send-pushover-message (sota:spot-hash-key (gethash n sota:*spots*)) :cosmic)
-		    (send-pushover-message (sota:spot-hash-key (gethash n sota:*spots*)) :spacealarm))))
+		    (send-pushover-message
+		     (sota:spot-hash-key
+		      (gethash n sota:*spots*)) :cosmic)
+		    (send-pushover-message
+		     (sota:spot-hash-key
+		      (gethash n sota:*spots*)) :spacealarm))))
 	    (get-my-spots *how-far-back* assocs bands modes))))
 
 (defun send-new-spots-thread ()
@@ -109,6 +130,10 @@ one as sent once it's passed to pushover)."
   (send-new-spots-thread))
 
 (defun make-bin (name)
-  "Write a an executable compiled version of the code to disk with the
+  "Write an executable compiled version of the code to disk with the
 specified name."
-  (sb-ext:save-lisp-and-die name :toplevel #'start-bin :executable t :purify t :compression 9))
+  (sb-ext:save-lisp-and-die name
+			    :toplevel #'start-bin
+			    :executable t
+			    :purify t
+			    :compression 9))

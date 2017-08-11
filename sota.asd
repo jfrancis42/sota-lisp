@@ -9,6 +9,7 @@
 	       #:bordeaux-threads
 	       #:read-number
 	       #:local-time
+	       #:cl-store
 	       #:aviation-formulary
 	       #:split-sequence
                #:cl-html-parse)
